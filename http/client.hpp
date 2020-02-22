@@ -53,7 +53,7 @@ namespace elx::http
         boost::asio::io_context& m_io_ctx;
         boost::asio::ssl::context& m_ssl_ctx;
         boost::asio::ip::tcp::resolver m_resolver;
-        std::unique_ptr<client_transport> m_transport;
+        client_transport m_transport;
 
     };
 }

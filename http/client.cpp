@@ -45,12 +45,11 @@ client::response client::synchronous_get(const request& req)
     // Setup encryption
     switch (req.encryption) {
         case request::encryption::none:
-            m_transport = std::make_unique<client_transport_plain>(m_io_ctx);
+            m_transport = client_transport::construct_tcp(m_io_ctx);
             break;
 
         case request::encryption::tls:
-            m_transport = std::make_unique<client_transport_tls>(m_io_ctx, m_ssl_ctx);
-            m_transport->set_hostname(req.host);
+            m_transport = client_transport::construct_tls(m_io_ctx, m_ssl_ctx);
             break;
     }
 
@@ -62,10 +61,10 @@ client::response client::synchronous_get(const request& req)
     auto const results = m_resolver.resolve(req.host, std::to_string(req.port));
 
     // Make the connection on any of the endpoints discovered by resolve
-    m_transport->connect(results);
+    m_transport.connect(results);
 
     // Perform handshake
-    m_transport->handshake();
+    m_transport.handshake(req.host);
 
     // Set up an HTTP GET request message
     http::request<boost::beast::http::string_body> beast_req;
@@ -78,20 +77,20 @@ client::response client::synchronous_get(const request& req)
     beast_req.target(req.target);
 
     // Send the HTTP beast_request to the remote host
-    m_transport->write(beast_req);
+    m_transport.write(beast_req);
 
     // Declare a container to hold the response
     response res;
 
     // Receive the HTTP response
     boost::beast::error_code ec;
-    m_transport->read(res.raw, ec);
+    m_transport.read(res.raw, ec);
     if (ec) {
         throw boost::beast::system_error{ec};
     }
 
     // Gracefully close the socket
-    m_transport->stream().socket().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+    m_transport.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
 
     // not_connected happens sometimes
     // so don't bother reporting it.
